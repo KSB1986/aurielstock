@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Auriel Brand-wise Stock Ledger</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#8B008B">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Auriel Ledger">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .table-container { -webkit-overflow-scrolling: touch; }
+        .app-scroller { -webkit-overflow-scrolling: touch; }
+        .table-container::-webkit-scrollbar { height: 6px; width: 6px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* Modal Background Blur */
+        .modal-backdrop { backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col">
+
+    <!-- Header (Shared) -->
+    <div class="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-sm shadow-sm">
+        <div class="max-w-[1400px] mx-auto p-3 sm:p-4 md:px-8 md:pt-8 md:pb-4">
+            <header class="border-b border-slate-200 pb-4 flex justify-between items-start sm:items-center">
+            <div>
+                <h1 class="leading-tight">
+                    <span class="text-[#8B008B] text-3xl sm:text-4xl font-bold">Auriel</span>
+                    <span class="block text-slate-900 text-2xl sm:text-3xl font-semibold" style="font-family: 'Times New Roman', serif; text-shadow: 2px 2px 0 rgba(0,0,0,0.12), 4px 4px 0 rgba(107,70,193,0.15);">Brand-wise Stock Ledger</span>
+                </h1>
+                <p class="text-slate-500 text-xs sm:text-sm mt-1">Automated tracking with PTS Value Calculations (Benic AI)</p>
+            </div>
+            <div class="mt-2 sm:mt-0 flex gap-2">
+                <button id="adminLoginBtn" onclick="openLoginModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 shadow-sm">
+                    🛡️ Admin Access
+                </button>
+                <button id="adminLogoutBtn" onclick="logoutAdmin()" class="hidden bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 text-xs sm:text-sm font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+                    Logout Admin
+                </button>
+            </div>
+        </header>
+    </div>
+
+    <!-- MAIN APP VIEW -->
+    <div id="mainAppView" class="max-w-[1400px] mx-auto p-3 sm:p-4 md:px-8 flex-1 min-h-0 overflow-y-auto app-scroller">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+            <!-- Entry Form -->
+            <div class="lg:col-span-1 bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
+                <h2 class="text-lg sm:text-xl font-semibold mb-4 text-slate-900">New Brand Entry</h2>
+                <form id="stockForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Party Name</label>
+                        <input type="text" id="partyName" required class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Place Name</label>
+                        <input type="text" id="placeName" required class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Month & Year</label>
+                        <input type="month" id="recordMonth" required class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm">
+                    </div>
+                    <div class="pt-2 border-t border-slate-100">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Brand (Material Desc.)</label>
+                        <select id="brandSelect" required class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm bg-white">
+                            <option value="">Select a brand...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">PTS (Excl. GST)</label>
+                        <input type="number" id="ptsValue" readonly class="w-full px-3 py-2.5 sm:py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-600 text-base sm:text-sm cursor-not-allowed">
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Opening Stock Qty</label>
+                            <input type="number" id="openingStock" min="0" class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm bg-slate-50" placeholder="Auto / Manual">
+                            <span id="openingHint" class="text-[11px] text-blue-600 block mt-0.5 hidden">✓ Carried from previous month</span>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Received Qty</label>
+                            <input type="number" id="receivedStock" min="0" required class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Secondary Qty</label>
+                            <input type="number" id="secondaryStock" min="0" required class="w-full px-3 py-2.5 sm:py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-base sm:text-sm">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 sm:py-2.5 rounded-lg text-sm transition-colors shadow-sm mt-4">
+                        Save Entry
+                    </button>
+                </form>
+            </div>
+
+            <!-- Dashboard & Tables -->
+            <div class="lg:col-span-3 space-y-4 sm:space-y-6">
+                <!-- Status Dashboard -->
+                <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h2 class="text-base sm:text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">📋 Submission Status Dashboard</h2>
+                    <div id="submissionSummary" class="space-y-3"></div>
+                </div>
+
+                <!-- Export Hub & Filters -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Filtered View & Download Options</h3>
+                        <div class="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Month</label>
+                                    <select id="filterMonth" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"></select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Party</label>
+                                    <select id="filterParty" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"></select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Place</label>
+                                    <select id="filterPlace" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"></select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Brand</label>
+                                    <select id="filterBrand" class="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-sm"></select>
+                                </div>
+                            </div>
+                            <div class="flex flex-col justify-between gap-3">
+                                <div class="flex gap-2">
+                                    <button onclick="applyFilters()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold py-2 rounded-lg transition-colors">Apply Filters</button>
+                                    <button onclick="clearFilters()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold py-2 rounded-lg transition-colors">Clear</button>
+                                </div>
+                                <div class="text-[12px] text-slate-500">Filter before export to download exactly the month, party, place or brand data you need. The Excel file will show each column clearly for easy review.</div>
+                                <div id="filterSummary" class="text-[12px] text-slate-600"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                        <button onclick="exportData('current')" class="flex items-center justify-center gap-1 sm:gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 sm:py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs transition-colors border border-slate-200">📥 Current View</button>
+                        <button onclick="exportData('month')" class="flex items-center justify-center gap-1 sm:gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 sm:py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs transition-colors border border-slate-200">📁 By Month</button>
+                        <button onclick="exportData('place')" class="flex items-center justify-center gap-1 sm:gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 sm:py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs transition-colors border border-slate-200">📍 By Place</button>
+                        <button onclick="exportData('party')" class="flex items-center justify-center gap-1 sm:gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 sm:py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs transition-colors border border-slate-200">🤝 By Party</button>
+                        <button onclick="exportData('brand')" class="flex items-center justify-center gap-1 sm:gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 sm:py-2 px-2 sm:px-3 rounded-lg text-[11px] sm:text-xs transition-colors border border-slate-200">💊 By Brand</button>
+                    </div>
+                </div>
+
+                <!-- Ledger Table -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div class="px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <h2 class="text-base sm:text-lg font-semibold text-slate-900">Detailed Value & Quantity Ledger</h2>
+                    </div>
+                    
+                    <div class="md:hidden text-[10px] text-blue-600 bg-blue-50/50 p-1.5 text-center border-b border-blue-100 font-medium">👉 Swipe left or right to view full table columns</div>
+                    
+                    <div class="table-container overflow-x-auto max-h-[60vh] sm:max-h-[550px]">
+                        <table class="w-full text-left border-collapse whitespace-nowrap min-w-[1000px] sm:min-w-[1200px]">
+                            <thead class="sticky top-0 z-10 bg-white shadow-sm">
+                                <tr class="bg-slate-100 text-[10px] sm:text-[11px] uppercase tracking-wider text-slate-500 border-y border-slate-200">
+                                    <th rowspan="2" class="py-2 px-2 sm:px-3 border-r border-slate-200 align-bottom">Period</th>
+                                    <th rowspan="2" class="py-2 px-2 sm:px-3 border-r border-slate-200 align-bottom">Party / Place</th>
+                                    <th rowspan="2" class="py-2 px-2 sm:px-3 border-r border-slate-200 align-bottom">Brand</th>
+                                    <th rowspan="2" class="py-2 px-2 sm:px-3 border-r border-slate-200 align-bottom">PTS</th>
+                                    <th colspan="2" class="py-2 px-2 sm:px-3 text-center border-r border-slate-200 bg-slate-50">Opening Stock</th>
+                                    <th colspan="2" class="py-2 px-2 sm:px-3 text-center border-r border-slate-200 bg-green-50/50">Received Stock</th>
+                                    <th colspan="2" class="py-2 px-2 sm:px-3 text-center border-r border-slate-200 bg-slate-50">Total Stock</th>
+                                    <th colspan="2" class="py-2 px-2 sm:px-3 text-center border-r border-slate-200 bg-amber-50/50">Secondary Stock</th>
+                                    <th colspan="2" class="py-2 px-2 sm:px-3 text-center border-r border-slate-200 bg-blue-50/50 text-blue-800 font-bold">Closing Stock</th>
+                                    <th rowspan="2" class="py-2 px-2 sm:px-3 text-center align-bottom">Action</th>
+                                </tr>
+                                <tr class="bg-slate-50 text-[9px] sm:text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-200">
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200">Qty</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200">Value (₹)</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200 bg-green-50/30">Qty</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200 bg-green-50/30">Value (₹)</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200">Qty</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200">Value (₹)</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200 bg-amber-50/30">Qty</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200 bg-amber-50/30">Value (₹)</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200 bg-blue-50/30">Qty</th>
+                                    <th class="py-1 px-1.5 sm:px-2 text-right border-r border-slate-200 bg-blue-50/30">Value (₹)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledgerBody" class="divide-y divide-slate-100 text-xs sm:text-sm"></tbody>
+                        </table>
+                        <div id="emptyState" class="p-6 sm:p-8 text-center text-slate-400 hidden text-sm">No records stored yet. Fill the form to begin tracking.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN DASHBOARD VIEW (Hidden by Default) -->
+    <div id="adminAppView" class="hidden max-w-[1400px] mx-auto p-3 sm:p-4 md:px-8">
+        <div class="bg-slate-900 rounded-xl shadow-lg p-6 sm:p-8 text-white mb-6">
+            <h2 class="text-2xl font-bold flex items-center gap-2">🛡️ Security & Administration Center</h2>
+            <p class="text-slate-400 text-sm mt-1">Global oversight controls for PTS updates, strict lock overrides, and data deletion.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Left: Brand PTS Manager -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col h-[500px]">
+                <h3 class="text-lg font-bold text-slate-800 mb-1">Brand PTS Registry</h3>
+                <p class="text-xs text-slate-500 mb-4">Changes apply to future entries only. Past ledger values remain untouched.</p>
+                
+                <div class="overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                    <div id="adminBrandList" class="space-y-2">
+                        <!-- Brand PTS controls injected here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Submission Unlocks & Danger Zone -->
+            <div class="space-y-6 flex flex-col h-[500px]">
+                
+                <!-- Unlock Manager -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex-1 flex flex-col min-h-[240px]">
+                    <h3 class="text-lg font-bold text-slate-800 mb-1">Locked Submissions Override</h3>
+                    <p class="text-xs text-slate-500 mb-4">Force-unlock statements that were finalized by users.</p>
+                    <div class="overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                        <div id="adminUnlockList" class="space-y-2">
+                            <!-- Locked parties injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="bg-red-50 p-5 rounded-xl shadow-sm border border-red-200 flex-1 flex flex-col min-h-[240px]">
+                    <h3 class="text-lg font-bold text-red-800 mb-1">Global Data Purge (Danger Zone)</h3>
+                    <p class="text-xs text-red-600 mb-4">Permanently erase all historical records tied to a specific party.</p>
+                    <div class="overflow-y-auto flex-1 pr-2 custom-scrollbar">
+                        <div id="adminPartyList" class="space-y-2">
+                            <!-- Parties for deletion injected here -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- OTP Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-900/50 modal-backdrop hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transition-all">
+            <!-- Header -->
+            <div class="bg-slate-800 p-5 text-white">
+                <h3 class="text-lg font-bold">Admin Authentication</h3>
+                <p class="text-xs text-slate-300 mt-1">Secure login via OTP verification</p>
+            </div>
+            
+            <div class="p-6">
+                <!-- Step 1: Email -->
+                <div id="stepEmail">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Registered Admin Email</label>
+                    <input type="email" id="adminEmailInput" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm mb-4" placeholder="Enter your email address">
+                    
+                    <div class="flex gap-3">
+                        <button onclick="closeLoginModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 rounded-lg text-sm transition-colors">Cancel</button>
+                        <button onclick="requestOTP()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg text-sm transition-colors shadow-sm">Send OTP</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: OTP -->
+                <div id="stepOTP" class="hidden">
+                    <div class="bg-green-50 text-green-700 text-xs p-3 rounded-lg border border-green-200 mb-4 font-medium text-center">
+                        ✓ OTP has been securely generated.
+                    </div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Enter 6-Digit OTP</label>
+                    <input type="number" id="adminOTPInput" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500 text-center text-lg tracking-widest font-bold mb-4" placeholder="------">
+                    
+                    <div class="flex gap-3">
+                        <button onclick="closeLoginModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 rounded-lg text-sm transition-colors">Cancel</button>
+                        <button onclick="verifyOTP()" class="flex-1 bg-slate-900 hover:bg-black text-white font-medium py-3 rounded-lg text-sm transition-colors shadow-sm">Verify & Login</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Engine -->
+    <script>
+        // --- 1. DEFAULT DATA & STORAGE INITIALIZATION ---
+        const defaultBrandCatalog = [
+            { name: "AFDURA", pts: 269.49 }, { name: "BETHERAN 25 MG", pts: 125.35 },
+            { name: "DUTAGEN SOFGEL CAP 0.5MG 12X3X10S R-UT", pts: 220.50 }, { name: "FLOTRAL D 10'S TAB", pts: 269.49 },
+            { name: "FLOTRAL T TABLETS", pts: 247.50 }, { name: "FLOTRAL TAB 10 MG 30'S", pts: 406.93 },
+            { name: "MYFOS", pts: 327.09 }, { name: "NIFTRAN 100 MG 10S", pts: 63.29 },
+            { name: "NIFTRAN 100 MG 30S", pts: 189.86 }, { name: "NOCULI B6 ORAL LIQUID", pts: 140.78 },
+            { name: "NOCULI ORAL SOLUTION 450ML IN", pts: 142.72 }, { name: "NOCULI ORAL SOLUTION 500ML", pts: 153.64 },
+            { name: "NOCULI TABLETS 10X10'S", pts: 46.93 }, { name: "ROLIFLO OD 2", pts: 180.65 },
+            { name: "ROLIFLO OD 4", pts: 252.00 }, { name: "ROLITEN OD 2", pts: 127.93 },
+            { name: "ROLITEN OD 4", pts: 256.50 }, { name: "ROLITEN TABLETS 1 MG (3X3X10'S)", pts: 76.50 },
+            { name: "ROLITEN TABLETS 2 MG (3X3X10'S)", pts: 133.07 }, { name: "SILODAL 4MG CAPSULES", pts: 135.64 },
+            { name: "SILODAL 8", pts: 218.74 }, { name: "SILODAL D 8", pts: 322.29 },
+            { name: "SILODAL D4 CAPSULES", pts: 186.43 }, { name: "SILODAL M 25 TABLETS 10'S", pts: 302.15 },
+            { name: "SILODAL M 50 TABLETS 10'S", pts: 366.43 }, { name: "SILODAL T CAPSULES", pts: 306.00 },
+            { name: "SOLITEN ORAL SOLUTION 60ML", pts: 257.14 }, { name: "SOLITEN TABLETS 10 MG 3X10'S", pts: 329.14 },
+            { name: "SOLITEN TABLETS 5 MG 3X10'S", pts: 268.72 }
+        ];
+
+        // Load dynamic brands from storage, or use defaults
+        let brandCatalog = JSON.parse(localStorage.getItem('dynamicBrandCatalog'));
+        if (!brandCatalog || brandCatalog.length === 0) {
+            brandCatalog = defaultBrandCatalog;
+            localStorage.setItem('dynamicBrandCatalog', JSON.stringify(brandCatalog));
+        }
+
+        let stockRecords = JSON.parse(localStorage.getItem('brandStockRecords')) || [];
+        let lockStatus = JSON.parse(localStorage.getItem('submissionLockStatus')) || {};
+        
+        // Admin Auth State
+        let isAdmin = false;
+        let generatedOTP = null;
+
+        // DOM elements
+        const form = document.getElementById('stockForm');
+        const partyInput = document.getElementById('partyName');
+        const placeInput = document.getElementById('placeName');
+        const monthInput = document.getElementById('recordMonth');
+        const brandSelect = document.getElementById('brandSelect');
+        const ptsInput = document.getElementById('ptsValue');
+        const openingInput = document.getElementById('openingStock');
+        const receivedInput = document.getElementById('receivedStock');
+        const secondaryInput = document.getElementById('secondaryStock');
+        const filterMonth = document.getElementById('filterMonth');
+        const filterParty = document.getElementById('filterParty');
+        const filterPlace = document.getElementById('filterPlace');
+        const filterBrand = document.getElementById('filterBrand');
+        const filterSummary = document.getElementById('filterSummary');
+        const ledgerBody = document.getElementById('ledgerBody');
+        const emptyState = document.getElementById('emptyState');
+        const openingHint = document.getElementById('openingHint');
+        const submissionSummary = document.getElementById('submissionSummary');
+
+        const activeFilters = { month: '', party: '', place: '', brand: '' };
+        const adminEmailAddress = 'kalyansundarbera@gmail.com'; // Set your admin email here
+
+        // --- 2. AUTHENTICATION & ADMIN ROUTING ---
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.remove('hidden');
+            document.getElementById('stepEmail').classList.remove('hidden');
+            document.getElementById('stepOTP').classList.add('hidden');
+            document.getElementById('adminEmailInput').value = '';
+            document.getElementById('adminOTPInput').value = '';
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.add('hidden');
+            generatedOTP = null;
+        }
+
+        function requestOTP() {
+            const email = document.getElementById('adminEmailInput').value.trim().toLowerCase();
+            if (email === adminEmailAddress.toLowerCase()) {
+                // Securely simulate OTP since there is no server to send physical emails
+                generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
+                
+                document.getElementById('stepEmail').classList.add('hidden');
+                document.getElementById('stepOTP').classList.remove('hidden');
+                
+                // Show OTP to user via alert (simulating receiving an email)
+                setTimeout(() => {
+                    alert(`SYSTEM SIMULATION: Normally this goes to your inbox.\n\nYour Admin OTP is: ${generatedOTP}`);
+                }, 500);
+            } else {
+                alert("Unauthorized Email Address. Access Denied.");
+            }
+        }
+
+        function verifyOTP() {
+            const inputOTP = document.getElementById('adminOTPInput').value.trim();
+            if (inputOTP === generatedOTP) {
+                isAdmin = true;
+                closeLoginModal();
+                toggleAdminView(true);
+            } else {
+                alert("Invalid OTP code. Please try again.");
+            }
+        }
+
+        function logoutAdmin() {
+            isAdmin = false;
+            toggleAdminView(false);
+        }
+
+        function toggleAdminView(showAdmin) {
+            if (showAdmin) {
+                document.getElementById('mainAppView').classList.add('hidden');
+                document.getElementById('adminAppView').classList.remove('hidden');
+                document.getElementById('adminLoginBtn').classList.add('hidden');
+                document.getElementById('adminLogoutBtn').classList.remove('hidden');
+                populateAdminDashboards();
+            } else {
+                document.getElementById('mainAppView').classList.remove('hidden');
+                document.getElementById('adminAppView').classList.add('hidden');
+                document.getElementById('adminLoginBtn').classList.remove('hidden');
+                document.getElementById('adminLogoutBtn').classList.add('hidden');
+                populateBrandDropdown(); // Refresh dropdown in case PTS changed
+                renderTable(); // Re-render main table
+                renderDashboard();
+            }
+        }
+
+        // --- 3. ADMIN FUNCTIONALITY IMPLEMENTATIONS ---
+        function populateAdminDashboards() {
+            // A. Populate Brands
+            const brandContainer = document.getElementById('adminBrandList');
+            brandContainer.innerHTML = '';
+            brandCatalog.forEach((brand, index) => {
+                brandContainer.innerHTML += `
+                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 border-b border-slate-100">
+                        <span class="text-sm font-medium text-slate-700 truncate w-1/2" title="${brand.name}">${brand.name}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400">₹</span>
+                            <input type="number" step="0.01" id="adminPts_${index}" value="${brand.pts}" class="w-24 px-2 py-1 border border-slate-300 rounded text-sm focus:border-blue-500 outline-none text-right">
+                            <button onclick="adminUpdatePTS(${index})" class="bg-slate-800 text-white text-xs px-3 py-1.5 rounded hover:bg-black transition-colors">Save</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // B. Populate Locked Submissions
+            const unlockContainer = document.getElementById('adminUnlockList');
+            unlockContainer.innerHTML = '';
+            const lockedKeys = Object.keys(lockStatus).filter(k => lockStatus[k] === true);
+            
+            if (lockedKeys.length === 0) {
+                unlockContainer.innerHTML = '<p class="text-sm text-slate-400 p-2 italic">No locked submissions found.</p>';
+            } else {
+                lockedKeys.forEach(key => {
+                    const [month, party] = key.split('_');
+                    const cleanParty = party.charAt(0).toUpperCase() + party.slice(1);
+                    unlockContainer.innerHTML += `
+                        <div class="flex items-center justify-between p-2.5 bg-green-50/50 border border-green-100 rounded mb-2">
+                            <div>
+                                <span class="font-bold text-sm text-slate-800">${cleanParty}</span>
+                                <span class="text-xs text-slate-500 ml-2 bg-white px-1.5 py-0.5 rounded border border-slate-200">${formatDisplayMonth(month)}</span>
+                            </div>
+                            <button onclick="adminForceUnlock('${key}')" class="bg-white border border-slate-300 text-slate-700 hover:text-red-600 hover:border-red-300 text-xs font-semibold px-3 py-1.5 rounded transition-colors shadow-sm">
+                                Force Unlock
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+
+            // C. Populate Party Deletion (Danger Zone)
+            const partyContainer = document.getElementById('adminPartyList');
+            partyContainer.innerHTML = '';
+            const uniqueParties = [...new Set(stockRecords.map(r => r.party.toLowerCase()))];
+            
+            if (uniqueParties.length === 0) {
+                partyContainer.innerHTML = '<p class="text-sm text-slate-400 p-2 italic">Database is empty.</p>';
+            } else {
+                uniqueParties.forEach(party => {
+                    const cleanParty = party.charAt(0).toUpperCase() + party.slice(1);
+                    partyContainer.innerHTML += `
+                        <div class="flex items-center justify-between p-2.5 bg-white border border-red-100 rounded mb-2">
+                            <span class="font-bold text-sm text-slate-800">${cleanParty}</span>
+                            <button onclick="adminDeleteParty('${party}')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors shadow-sm">
+                                Delete All Data
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // Admin Action: Update PTS
+        function adminUpdatePTS(index) {
+            const inputVal = document.getElementById(`adminPts_${index}`).value;
+            const newPts = Number(inputVal);
+            if (isNaN(newPts) || newPts < 0) {
+                alert("Invalid PTS value.");
+                return;
+            }
+            brandCatalog[index].pts = newPts;
+            localStorage.setItem('dynamicBrandCatalog', JSON.stringify(brandCatalog));
+            
+            // Show brief visual feedback on the button
+            const btn = document.querySelector(`#adminPts_${index}`).nextElementSibling;
+            const originalText = btn.innerText;
+            btn.innerText = "Saved ✓";
+            btn.classList.add("bg-green-600");
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove("bg-green-600");
+            }, 1500);
+        }
+
+        // Admin Action: Force Unlock
+        function adminForceUnlock(key) {
+            if(confirm("Are you sure you want to forcibly unlock this statement? Users will be able to alter historical data again.")) {
+                delete lockStatus[key];
+                localStorage.setItem('submissionLockStatus', JSON.stringify(lockStatus));
+                populateAdminDashboards();
+            }
+        }
+
+        // Admin Action: Delete Party
+        function adminDeleteParty(partyNameLower) {
+            if(confirm(`⚠️ CRITICAL WARNING ⚠️\n\nAre you absolutely sure you want to delete EVERY record for ${partyNameLower.toUpperCase()}? This action cannot be undone.`)) {
+                // Remove records
+                stockRecords = stockRecords.filter(r => r.party.toLowerCase() !== partyNameLower);
+                localStorage.setItem('brandStockRecords', JSON.stringify(stockRecords));
+                
+                // Clear any associated locks
+                Object.keys(lockStatus).forEach(key => {
+                    if (key.endsWith(`_${partyNameLower}`)) {
+                        delete lockStatus[key];
+                    }
+                });
+                localStorage.setItem('submissionLockStatus', JSON.stringify(lockStatus));
+                
+                populateAdminDashboards();
+            }
+        }
+
+        // Admin Action: Delete single entry (Override standard user block)
+        function adminDeleteRecord(index) {
+            if(confirm("ADMIN OVERRIDE: Delete this specific entry?")) {
+                stockRecords.splice(index, 1);
+                saveAndRefresh();
+            }
+        }
+
+
+        // --- 4. CORE APPLICATION LOGIC (MAIN VIEW) ---
+        function populateBrandDropdown() {
+            brandSelect.innerHTML = '<option value="">Select a brand...</option>';
+            brandCatalog.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.name;
+                opt.textContent = b.name;
+                brandSelect.appendChild(opt);
+            });
+        }
+
+        populateBrandDropdown();
+        populateFilterOptions();
+        renderFilterSummary();
+
+        brandSelect.addEventListener('change', () => {
+            const selectedBrand = brandCatalog.find(b => b.name === brandSelect.value);
+            ptsInput.value = selectedBrand ? selectedBrand.pts : '';
+            checkAndCalculateOpeningStock();
+        });
+
+        [partyInput, placeInput, monthInput].forEach(input => {
+            input.addEventListener('input', checkAndCalculateOpeningStock);
+        });
+
+        function getFilteredRecords() {
+            return stockRecords.filter(record => {
+                if (activeFilters.month && record.month !== activeFilters.month) return false;
+                if (activeFilters.party && record.party.toLowerCase() !== activeFilters.party.toLowerCase()) return false;
+                if (activeFilters.place && record.place.toLowerCase() !== activeFilters.place.toLowerCase()) return false;
+                if (activeFilters.brand && record.brand !== activeFilters.brand) return false;
+                return true;
+            });
+        }
+
+        function populateFilterOptions() {
+            const months = [...new Set(stockRecords.map(r => r.month))].sort((a,b) => b.localeCompare(a));
+            const parties = [...new Set(stockRecords.map(r => r.party))].sort((a,b) => a.localeCompare(b));
+            const places = [...new Set(stockRecords.map(r => r.place))].sort((a,b) => a.localeCompare(b));
+            const brands = [...new Set(stockRecords.map(r => r.brand))].sort((a,b) => a.localeCompare(b));
+
+            fillSelect(filterMonth, months, 'All months');
+            fillSelect(filterParty, parties, 'All parties');
+            fillSelect(filterPlace, places, 'All places');
+            fillSelect(filterBrand, brands, 'All brands');
+        }
+
+        function fillSelect(selectEl, values, label) {
+            selectEl.innerHTML = `<option value="">${label}</option>` + values.map(value => `<option value="${value}">${value}</option>`).join('');
+            selectEl.value = activeFilters[selectEl.id.replace('filter', '').toLowerCase()];
+        }
+
+        function renderFilterSummary() {
+            const filtered = getFilteredRecords();
+            const total = stockRecords.length;
+            if (activeFilters.month || activeFilters.party || activeFilters.place || activeFilters.brand) {
+                filterSummary.textContent = `Showing ${filtered.length} of ${total} records for selected filters.`;
+            } else {
+                filterSummary.textContent = `Showing all ${total} records. Use filters above to narrow the view.`;
+            }
+        }
+
+        function applyFilters() {
+            activeFilters.month = filterMonth.value;
+            activeFilters.party = filterParty.value;
+            activeFilters.place = filterPlace.value;
+            activeFilters.brand = filterBrand.value;
+            renderFilterSummary();
+            renderTable();
+        }
+
+        function clearFilters() {
+            activeFilters.month = '';
+            activeFilters.party = '';
+            activeFilters.place = '';
+            activeFilters.brand = '';
+            filterMonth.value = '';
+            filterParty.value = '';
+            filterPlace.value = '';
+            filterBrand.value = '';
+            renderFilterSummary();
+            renderTable();
+        }
+
+        function getPreviousMonthString(monthStr) {
+            const [year, month] = monthStr.split('-').map(Number);
+            const date = new Date(year, month - 2, 1); 
+            const prevYear = date.getFullYear();
+            const prevMonth = String(date.getMonth() + 1).padStart(2, '0');
+            return `${prevYear}-${prevMonth}`;
+        }
+
+        function checkAndCalculateOpeningStock() {
+            const party = partyInput.value.trim().toLowerCase();
+            const place = placeInput.value.trim().toLowerCase();
+            const brand = brandSelect.value;
+            const currentMonth = monthInput.value;
+
+            if (!party || !place || !currentMonth || !brand) return;
+
+            const targetPreviousMonth = getPreviousMonthString(currentMonth);
+
+            const match = stockRecords.find(r => 
+                r.party.toLowerCase() === party && 
+                r.place.toLowerCase() === place && 
+                r.brand === brand &&
+                r.month === targetPreviousMonth
+            );
+
+            if (match) {
+                openingInput.value = match.closingStock;
+                openingInput.readOnly = true;
+                openingHint.classList.remove('hidden');
+            } else {
+                openingInput.value = '';
+                openingInput.readOnly = false;
+                openingHint.classList.add('hidden');
+            }
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const party = partyInput.value.trim();
+            const place = placeInput.value.trim();
+            const month = monthInput.value;
+            const brand = brandSelect.value;
+            
+            const statusKey = `${month}_${party.toLowerCase()}`;
+            if (lockStatus[statusKey]) {
+                alert(`🚫 ENTRY BLOCKED: ${party}'s statement for ${formatDisplayMonth(month)} has been marked as Final. Admin intervention required.`);
+                return;
+            }
+
+            const pts = Number(ptsInput.value);
+            const openingStock = Number(openingInput.value) || 0;
+            const receivedStock = Number(receivedInput.value) || 0;
+            const secondaryStock = Number(secondaryInput.value) || 0;
+
+            const totalStock = openingStock + receivedStock;
+            const closingStock = totalStock - secondaryStock;
+
+            if(closingStock < 0) {
+                alert("Warning: Closing stock cannot drop below zero. Please verify Secondary Stock volumes.");
+                return;
+            }
+
+            const existingIndex = stockRecords.findIndex(r => 
+                r.party.toLowerCase() === party.toLowerCase() && 
+                r.place.toLowerCase() === place.toLowerCase() && 
+                r.month === month &&
+                r.brand === brand
+            );
+
+            const recordPayload = {
+                party, place, month, brand, pts, 
+                openingStock, receivedStock, totalStock, secondaryStock, closingStock
+            };
+
+            if (existingIndex > -1) {
+                stockRecords[existingIndex] = recordPayload;
+            } else {
+                stockRecords.push(recordPayload);
+            }
+
+            saveAndRefresh();
+            
+            openingInput.value = '';
+            receivedInput.value = '';
+            secondaryInput.value = '';
+            openingInput.readOnly = false;
+            openingHint.classList.add('hidden');
+            checkAndCalculateOpeningStock(); 
+        });
+
+        function toggleLockStatus(month, partyStr) {
+            const statusKey = `${month}_${partyStr.toLowerCase()}`;
+            
+            if (lockStatus[statusKey]) {
+                if(confirm(`Reopen submission for ${partyStr} (${formatDisplayMonth(month)})?`)) {
+                    delete lockStatus[statusKey];
+                }
+            } else {
+                if(confirm(`Mark ${partyStr}'s submission for ${formatDisplayMonth(month)} as FINAL? This will lock the records.`)) {
+                    lockStatus[statusKey] = true;
+                }
+            }
+            
+            localStorage.setItem('submissionLockStatus', JSON.stringify(lockStatus));
+            renderDashboard();
+            renderTable();
+        }
+
+        function saveAndRefresh() {
+            stockRecords.sort((a,b) => b.month.localeCompare(a.month) || a.brand.localeCompare(b.brand));
+            localStorage.setItem('brandStockRecords', JSON.stringify(stockRecords));
+            populateFilterOptions();
+            renderTable();
+            renderDashboard();
+        }
+
+        function formatDisplayMonth(monthStr) {
+            const [year, month] = monthStr.split('-');
+            const date = new Date(year, month - 1);
+            return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(amount);
+        }
+
+        function renderDashboard() {
+            submissionSummary.innerHTML = '';
+            if (stockRecords.length === 0) {
+                submissionSummary.innerHTML = '<p class="text-sm text-slate-400 italic py-2">No submissions recorded yet.</p>';
+                return;
+            }
+
+            const grouped = {};
+            stockRecords.forEach(record => {
+                if (!grouped[record.month]) grouped[record.month] = {};
+                const pName = record.party.charAt(0).toUpperCase() + record.party.slice(1).toLowerCase();
+                if (!grouped[record.month][pName]) grouped[record.month][pName] = 0;
+                grouped[record.month][pName]++;
+            });
+
+            const sortedMonths = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+            sortedMonths.forEach(month => {
+                const monthDiv = document.createElement('div');
+                monthDiv.className = "border border-slate-200 rounded-lg p-3 bg-white mb-4 shadow-sm";
+                
+                const monthTitle = document.createElement('div');
+                monthTitle.className = "text-sm font-bold text-slate-800 mb-3 border-b border-slate-100 pb-2";
+                monthTitle.innerText = formatDisplayMonth(month);
+                monthDiv.appendChild(monthTitle);
+
+                const partyContainer = document.createElement('div');
+                partyContainer.className = "grid grid-cols-1 md:grid-cols-2 gap-2";
+
+                const parties = Object.keys(grouped[month]).sort();
+                parties.forEach(party => {
+                    const statusKey = `${month}_${party.toLowerCase()}`;
+                    const isLocked = lockStatus[statusKey] === true;
+                    
+                    const row = document.createElement('div');
+                    row.className = `flex items-center justify-between p-2.5 rounded border ${isLocked ? 'bg-green-50/50 border-green-200' : 'bg-slate-50 border-slate-200'}`;
+                    
+                    const brandCount = grouped[month][party];
+                    
+                    const details = document.createElement('div');
+                    details.innerHTML = `
+                        <span class="font-semibold text-sm text-slate-800">${party}</span>
+                        <span class="text-[11px] text-slate-500 ml-2 bg-white px-1.5 py-0.5 rounded border border-slate-200">${brandCount} brand${brandCount > 1 ? 's' : ''}</span>
+                    `;
+                    
+                    const actionBtn = document.createElement('button');
+                    actionBtn.onclick = () => toggleLockStatus(month, party);
+                    if (isLocked) {
+                        actionBtn.className = "text-[11px] font-bold text-green-700 bg-green-100 hover:bg-green-200 px-3 py-1.5 rounded transition-colors flex items-center gap-1";
+                        actionBtn.innerHTML = "✅ Finalized";
+                        actionBtn.title = "Click to reopen";
+                    } else {
+                        actionBtn.className = "text-[11px] font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded transition-colors";
+                        actionBtn.innerHTML = "Mark Final";
+                    }
+
+                    row.appendChild(details);
+                    row.appendChild(actionBtn);
+                    partyContainer.appendChild(row);
+                });
+                monthDiv.appendChild(partyContainer);
+                submissionSummary.appendChild(monthDiv);
+            });
+        }
+
+        function renderTable() {
+            ledgerBody.innerHTML = '';
+            const recordsToShow = getFilteredRecords();
+
+            if (stockRecords.length === 0) {
+                emptyState.textContent = 'No records stored yet. Fill the form to begin tracking.';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            if (recordsToShow.length === 0) {
+                emptyState.textContent = 'No records match the selected filters. Clear filters or try another selection.';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+
+            recordsToShow.forEach((record) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                
+                const opVal = record.openingStock * record.pts;
+                const recVal = record.receivedStock * record.pts;
+                const totVal = record.totalStock * record.pts;
+                const secVal = record.secondaryStock * record.pts;
+                const closVal = record.closingStock * record.pts;
+
+                const statusKey = `${record.month}_${record.party.toLowerCase()}`;
+                const isLocked = lockStatus[statusKey] === true;
+                const originalIndex = stockRecords.indexOf(record);
+                
+                // Admin can delete anything. Users cannot delete locked rows.
+                let actionHtml = '';
+                if (isAdmin) {
+                    actionHtml = `<button onclick="adminDeleteRecord(${originalIndex})" class="text-red-500 hover:text-red-700 font-bold transition-colors p-2 text-lg leading-none" title="Admin Override Delete">✕</button>`;
+                } else {
+                    actionHtml = isLocked 
+                        ? `<span class="text-[10px] text-green-600 font-bold" title="Finalized">🔒</span>`
+                        : `<button onclick="deleteRecord(${originalIndex})" class="text-slate-400 hover:text-red-500 transition-colors p-2 text-lg leading-none">✕</button>`;
+                }
+
+                tr.innerHTML = `
+                    <td class="py-2 px-2 sm:px-3 border-r border-slate-200 font-medium">${formatDisplayMonth(record.month)}</td>
+                    <td class="py-2 px-2 sm:px-3 border-r border-slate-200 max-w-[120px] sm:max-w-none truncate">
+                        <div class="font-medium text-slate-800 truncate" title="${record.party}">${record.party}</div>
+                        <div class="text-[10px] sm:text-xs text-slate-400 truncate" title="${record.place}">${record.place}</div>
+                    </td>
+                    <td class="py-2 px-2 sm:px-3 border-r border-slate-200 text-[11px] sm:text-[13px] font-semibold text-slate-700 max-w-[150px] truncate" title="${record.brand}">${record.brand}</td>
+                    <td class="py-2 px-2 sm:px-3 border-r border-slate-200 text-right">${record.pts.toFixed(2)}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200">${record.openingStock}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 text-slate-500">${formatCurrency(opVal)}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 text-green-700 bg-green-50/30">+${record.receivedStock}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 text-green-600 bg-green-50/30">${formatCurrency(recVal)}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200">${record.totalStock}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 text-slate-500">${formatCurrency(totVal)}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 text-amber-700 bg-amber-50/30">-${record.secondaryStock}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 text-amber-600 bg-amber-50/30">${formatCurrency(secVal)}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 font-bold text-blue-700 bg-blue-50/30">${record.closingStock}</td>
+                    <td class="py-2 px-2 sm:px-3 text-right border-r border-slate-200 font-bold text-blue-700 bg-blue-50/30">${formatCurrency(closVal)}</td>
+                    <td class="py-2 px-2 sm:px-3 text-center">${actionHtml}</td>
+                `;
+                ledgerBody.appendChild(tr);
+            });
+        }
+
+        function deleteRecord(index) {
+            const record = stockRecords[index];
+            const statusKey = `${record.month}_${record.party.toLowerCase()}`;
+            if (lockStatus[statusKey]) {
+                alert(`Cannot delete. ${record.party}'s statement for ${formatDisplayMonth(record.month)} is finalized. Reopen it from the dashboard first.`);
+                return;
+            }
+            if(confirm("Delete this entry?")) {
+                stockRecords.splice(index, 1);
+                saveAndRefresh();
+            }
+        }
+
+        // Export engine omitted for brevity, identical to previous version.
+        function exportData(criteriaType) {
+            const recordsToExport = getFilteredRecords();
+            if (recordsToExport.length === 0) return alert("There are no records to export with the current filters.");
+            const wb = XLSX.utils.book_new();
+            const formatRow = (r) => ({
+                'Month & Year': formatDisplayMonth(r.month),
+                'Party Name': r.party,
+                'Place Location': r.place,
+                'Submission Status': lockStatus[`${r.month}_${r.party.toLowerCase()}`] ? 'Finalized' : 'Draft',
+                'Brand (Material Desc)': r.brand,
+                'PTS (Excl GST)': r.pts,
+                'Opening Qty': r.openingStock,
+                'Opening Value (INR)': r.openingStock * r.pts,
+                'Received Qty': r.receivedStock,
+                'Received Value (INR)': r.receivedStock * r.pts,
+                'Total Qty': r.totalStock,
+                'Total Value (INR)': r.totalStock * r.pts,
+                'Secondary Qty': r.secondaryStock,
+                'Secondary Value (INR)': r.secondaryStock * r.pts,
+                'Closing Qty': r.closingStock,
+                'Closing Value (INR)': r.closingStock * r.pts
+            });
+
+            if (criteriaType === 'current') {
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recordsToExport.map(formatRow)), 'Filtered Data');
+            } else if (criteriaType === 'month') {
+                [...new Set(recordsToExport.map(r => r.month))].forEach(m => {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recordsToExport.filter(r => r.month === m).map(formatRow)), m);
+                });
+            } else if (criteriaType === 'place') {
+                [...new Set(recordsToExport.map(r => r.place))].forEach(p => {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recordsToExport.filter(r => r.place.toLowerCase() === p.toLowerCase()).map(formatRow)), p.substring(0, 30));
+                });
+            } else if (criteriaType === 'party') {
+                [...new Set(recordsToExport.map(r => r.party))].forEach(pt => {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recordsToExport.filter(r => r.party.toLowerCase() === pt.toLowerCase()).map(formatRow)), pt.substring(0, 30));
+                });
+            } else if (criteriaType === 'brand') {
+                [...new Set(recordsToExport.map(r => r.brand))].forEach(b => {
+                    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recordsToExport.filter(r => r.brand === b).map(formatRow)), b.replace(/[\\/*?:\[\]]/g, '').substring(0, 31));
+                });
+            }
+
+            const safeCriteria = criteriaType === 'current' ? 'filtered_view' : criteriaType;
+            XLSX.writeFile(wb, `Stock_Value_Report_${safeCriteria.toUpperCase()}_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        renderTable();
+        renderDashboard();
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered:', reg.scope))
+                    .catch(err => console.warn('Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
