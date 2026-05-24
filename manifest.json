@@ -1,0 +1,16 @@
+{
+  "name": "Auriel Brand-wise Stock Ledger",
+  "short_name": "Auriel Ledger",
+  "description": "Track brand-wise stock values with filterable exports and offline-ready reporting.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#8B008B",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
